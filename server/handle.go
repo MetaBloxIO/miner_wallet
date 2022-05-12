@@ -1,9 +1,17 @@
 package server
 
 import (
-	"github.com/MetaBloxIO/miner_wallet/models"
+	"github.com/MetaBloxIO/metablox-foundation-services/models"
+	"github.com/MetaBloxIO/metablox-foundation-services/presentations"
 	"github.com/gin-gonic/gin"
 	"net/http"
+	"strconv"
+)
+
+const (
+	Success int = iota
+	NonceInvalid
+	VPInvalid
 )
 
 func InitRouter() *gin.Engine {
@@ -14,17 +22,37 @@ func InitRouter() *gin.Engine {
 		session := c.Param("session")
 		challenge, _ := pool.ApplyChallenge(session)
 
-		resp := Response{code: 0, data: challenge}
+		resp := Response{code: Success, data: challenge}
 
 		c.IndentedJSON(http.StatusOK, resp)
 	})
 
 	router.POST("/verifyVp", func(c *gin.Context) {
-		var body VerifyReqBody
-		if err := c.BindJSON(&body); err != nil {
+		var body models.VerifiablePresentation
+		err := c.BindJSON(&body)
+		session := c.GetHeader("session")
+		challenge, err := strconv.ParseUint(body.Proof.Nonce, 10, 64)
+
+		if err != nil {
+			sendError(NonceInvalid, nil, c)
 			return
 		}
-		//TODO 1. Verify VP Signature
+
+		pool.CheckChallenge(session, challenge)
+		if err != nil {
+			sendError(NonceInvalid, nil, c)
+			return
+		}
+
+		if false == checkVcSubType(body.VerifiableCredential, models.TypeWifi) {
+			sendError(VPInvalid, nil, c)
+		}
+
+		ret, err := presentations.VerifyVP(&body)
+		if err != nil || ret == false {
+			sendError(VPInvalid, nil, c)
+			return
+		}
 
 		//TODO 2. Create response vp
 		respVp := models.VerifiablePresentation{}
@@ -33,5 +61,23 @@ func InitRouter() *gin.Engine {
 		c.IndentedJSON(http.StatusOK, resp)
 	})
 
+	router.POST("/confirmNetwork", func(c *gin.Context) {
+	})
+
 	return router
+}
+
+func sendError(err int, data interface{}, c *gin.Context) {
+	resp := Response{code: err, data: data}
+	c.IndentedJSON(http.StatusOK, resp)
+}
+
+func checkVcSubType(credentials []models.VerifiableCredential, subType string) bool {
+	for _, credential := range credentials {
+		if credential.SubType == subType {
+			return true
+		}
+	}
+
+	return false
 }

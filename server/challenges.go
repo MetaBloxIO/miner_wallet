@@ -1,7 +1,7 @@
 package server
 
 import (
-	"github.com/google/uuid"
+	"math/rand"
 	"time"
 )
 
@@ -9,7 +9,7 @@ const timeout = 10
 
 type ChallengeRecord struct {
 	Time      time.Time
-	Challenge string
+	Challenge uint64
 }
 
 type ChallengePool struct {
@@ -36,18 +36,22 @@ func NewChallengePool() *ChallengePool {
 	return pool
 }
 
-func (p *ChallengePool) ApplyChallenge(session string) (string, error) {
-	record := ChallengeRecord{Time: time.Now(), Challenge: uuid.New().String()}
+func (p *ChallengePool) ApplyChallenge(session string) (uint64, error) {
+	record := ChallengeRecord{Time: time.Now(), Challenge: rand.Uint64()}
 	p.sessions[session] = record
 	return record.Challenge, nil
 }
 
-func (p *ChallengePool) CheckChallenge(session string, challenge string) bool {
+func (p *ChallengePool) CheckChallenge(session string, challenge uint64) bool {
 	c1, exists := p.sessions[session]
 	if exists == false {
 		return false
 	}
-	delete(p.sessions, session)
+	//delete(p.sessions, session)
+
+	if c1.Challenge != challenge {
+		return false
+	}
 
 	t := time.Now()
 	if t.UnixMilli()-c1.Time.UnixMilli() > timeout*1000 {
