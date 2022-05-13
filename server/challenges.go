@@ -1,6 +1,7 @@
 package server
 
 import (
+	"errors"
 	"math/rand"
 	"time"
 )
@@ -8,8 +9,9 @@ import (
 const timeout = 10
 
 type ChallengeRecord struct {
-	Time      time.Time
-	Challenge uint64
+	Time            time.Time
+	SelfChallenge   uint64
+	TargetChallenge uint64
 }
 
 type ChallengePool struct {
@@ -36,10 +38,10 @@ func NewChallengePool() *ChallengePool {
 	return pool
 }
 
-func (p *ChallengePool) ApplyChallenge(session string) (uint64, error) {
-	record := ChallengeRecord{Time: time.Now(), Challenge: rand.Uint64()}
+func (p *ChallengePool) ApplyChallenge(session string, targetChallenge uint64) (uint64, error) {
+	record := ChallengeRecord{Time: time.Now(), SelfChallenge: rand.Uint64(), TargetChallenge: targetChallenge}
 	p.sessions[session] = record
-	return record.Challenge, nil
+	return record.SelfChallenge, nil
 }
 
 func (p *ChallengePool) CheckChallenge(session string, challenge uint64) bool {
@@ -49,7 +51,7 @@ func (p *ChallengePool) CheckChallenge(session string, challenge uint64) bool {
 	}
 	//delete(p.sessions, session)
 
-	if c1.Challenge != challenge {
+	if c1.SelfChallenge != challenge {
 		return false
 	}
 
@@ -59,6 +61,35 @@ func (p *ChallengePool) CheckChallenge(session string, challenge uint64) bool {
 	}
 
 	return true
+}
+
+func (p *ChallengePool) GetTargetChallenge(session string) (uint64, error) {
+	c1, exists := p.sessions[session]
+	if exists == false {
+		return 0, errors.New("SessionNotFound")
+	}
+
+	return c1.TargetChallenge, nil
+}
+
+func (p *ChallengePool) IncrSelfChallenge(session string) error {
+	c1, exists := p.sessions[session]
+	if exists == false {
+		return errors.New("SessionNotFound")
+	}
+
+	c1.SelfChallenge++
+	return nil
+}
+
+func (p *ChallengePool) IncrTargetChallenge(session string) error {
+	c1, exists := p.sessions[session]
+	if exists == false {
+		return errors.New("SessionNotFound")
+	}
+
+	c1.TargetChallenge++
+	return nil
 }
 
 func (p *ChallengePool) ClearTimeoutSessions() {

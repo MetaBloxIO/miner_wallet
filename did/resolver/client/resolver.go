@@ -3,7 +3,6 @@ package client
 import (
 	"github.com/MetaBloxIO/miner_wallet/conf"
 	"github.com/MetaBloxIO/miner_wallet/did/resolver/registry"
-	"github.com/MetaBloxIO/miner_wallet/models"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethclient"
 	log "github.com/sirupsen/logrus"
@@ -46,8 +45,4 @@ func (r *Resolver) DestroyResolver() {
 	if r.conn != nil {
 		r.conn.Close()
 	}
-}
-
-func (r *Resolver) ResolveDID(did string) (*models.DIDDocument, error) {
-	return nil, nil
 }

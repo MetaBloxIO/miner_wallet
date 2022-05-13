@@ -2,15 +2,18 @@ package conf
 
 import (
 	"encoding/json"
+	"github.com/MetaBloxIO/metablox-foundation-services/models"
 	log "github.com/sirupsen/logrus"
 	"io/ioutil"
 	"os"
 )
 
 type Conf struct {
-	PrivateKey      string `json:"PrivateKey"`
-	Node            string `json:"Node"`
-	ContractAddress string `json:"ContractAddress"`
+	Did             string                      `json:"did"`
+	PrivateKey      string                      `json:"PrivateKey"`
+	Node            string                      `json:"Node"`
+	ContractAddress string                      `json:"ContractAddress"`
+	MinerVC         models.VerifiableCredential `json:"MinerVC"`
 }
 
 func LoadConf(file string) (*Conf, error) {
