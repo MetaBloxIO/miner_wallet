@@ -1,7 +1,11 @@
 package server
 
 import (
+	"bytes"
+	"crypto/sha256"
+	"errors"
 	"github.com/MetaBloxIO/metablox-foundation-services/did"
+	"github.com/MetaBloxIO/metablox-foundation-services/key"
 	"github.com/MetaBloxIO/metablox-foundation-services/models"
 	"github.com/MetaBloxIO/metablox-foundation-services/presentations"
 	"github.com/MetaBloxIO/miner_wallet/conf"
@@ -19,6 +23,7 @@ const (
 	ReqParamInvalid
 	NonceInvalid
 	VPInvalid
+	SignatureInvalid
 	ServerInnerError = 500
 )
 
@@ -42,7 +47,7 @@ func InitRouter() *gin.Engine {
 			return
 		}
 
-		targetChallenge, err := strconv.ParseUint(req.challenge, 10, 64)
+		targetChallenge, err := strconv.ParseUint(req.Challenge, 10, 64)
 		if err != nil {
 			sendError(ReqParamInvalid, nil, c)
 			return
@@ -50,7 +55,7 @@ func InitRouter() *gin.Engine {
 
 		challenge, _ := pool.ApplyChallenge(session, targetChallenge)
 
-		resp := Response{code: Success, data: challenge}
+		resp := Response{Code: Success, Data: challenge}
 
 		c.IndentedJSON(http.StatusOK, resp)
 	})
@@ -102,14 +107,14 @@ func InitRouter() *gin.Engine {
 			return
 		}
 
-		targetChallenge, err := pool.GetTargetChallenge(session)
+		targetChallenge, err := pool.GetChallenge(session)
 		if err != nil {
 			log.Error("Get challenge failed")
 			sendError(ServerInnerError, nil, c)
 			return
 		}
 
-		respVp, err := presentations.CreatePresentation(vcs, selfDoc, privKey, strconv.FormatUint(targetChallenge, 10))
+		respVp, err := presentations.CreatePresentation(vcs, *selfDoc, privKey, strconv.FormatUint(targetChallenge.TargetChallenge, 10))
 		if err != nil {
 			log.Error("Create vp failed")
 			sendError(ServerInnerError, nil, c)
@@ -119,18 +124,51 @@ func InitRouter() *gin.Engine {
 		pool.IncrTargetChallenge(session)
 		pool.IncrSelfChallenge(session)
 
-		resp := Response{code: 0, data: respVp}
+		resp := Response{Code: 0, Data: respVp}
 		c.IndentedJSON(http.StatusOK, resp)
 	})
 
 	router.POST("/confirmNetwork", func(c *gin.Context) {
+		var body NetworkConfirmRequest
+		err := c.BindJSON(&body)
+		if err != nil {
+			sendError(ReqParamInvalid, nil, c)
+			return
+		}
+
+		session := c.GetHeader("session")
+		challenge, err := pool.GetChallenge(session)
+		if err != nil {
+			sendError(NonceInvalid, nil, c)
+			return
+		}
+
+		//TODO Check Last blockchain
+
+		result, err := verifyNetworkReq(&body, strconv.FormatUint(challenge.SelfChallenge, 10))
+		if err != nil || result == false {
+			sendError(ServerInnerError, nil, c)
+			return
+		}
+
+		//TODO Get last blockchain
+		respResult := NetworkConfirmResult{Did: conf.Did, Target: body.Did, LastBlockHash: ""}
+		signature, err := signNetworkResult(&respResult, conf.PrivateKey, strconv.FormatUint(challenge.TargetChallenge, 10))
+		if err != nil || result == false {
+			sendError(ServerInnerError, nil, c)
+			return
+		}
+		respResult.Signature = signature
+
+		resp := Response{Code: 0, Data: respResult}
+		c.IndentedJSON(http.StatusOK, resp)
 	})
 
 	return router
 }
 
 func sendError(err int, data interface{}, c *gin.Context) {
-	resp := Response{code: err, data: data}
+	resp := Response{Code: err, Data: data}
 	c.IndentedJSON(http.StatusOK, resp)
 }
 
@@ -180,4 +218,71 @@ func createDid(privKeyHex string, didStr string) (*models.DIDDocument, error) {
 	//once blockchain is implemented, will also need to upload the document to the blockchain
 
 	return document, nil
+}
+
+func verifyNetworkReq(req *NetworkConfirmRequest, challenge string) (bool, error) {
+	bytes, err := serializeNetworkReq(req, challenge)
+
+	if err != nil {
+		log.Error("Serial")
+		return false, err
+	}
+
+	resolutionMeta, holderDoc, _ := did.Resolve(req.Did, models.CreateResolutionOptions())
+	if resolutionMeta.Error != "" {
+		return false, errors.New(resolutionMeta.Error)
+	}
+
+	targetVM := holderDoc.VerificationMethod[0]
+
+	hashedData := sha256.Sum256(bytes)
+	_, pubData, err := multibase.Decode(targetVM.MultibaseKey)
+	if err != nil {
+		return false, err
+	}
+
+	pubKey, err := crypto.UnmarshalPubkey(pubData)
+	if err != nil {
+		return false, err
+	}
+	return key.VerifyJWSSignature(req.Signature, pubKey, hashedData[:])
+}
+
+func serializeNetworkReq(req *NetworkConfirmRequest, challenge string) ([]byte, error) {
+	var buffer bytes.Buffer
+	buffer.WriteString(req.Did)
+	buffer.WriteString(req.Target)
+	buffer.WriteString(req.LastBlockHash)
+	buffer.WriteString(req.Quality)
+	buffer.WriteString(challenge)
+
+	return buffer.Bytes(), nil
+}
+
+func signNetworkResult(result *NetworkConfirmResult, privKeyHex string, challenge string) (string, error) {
+	bytes, err := serializeNetworkResult(result, challenge)
+
+	if err != nil {
+		log.Error("Serial")
+		return "", err
+	}
+
+	privKey, err := crypto.HexToECDSA(privKeyHex)
+	if err != nil {
+		return "", err
+	}
+
+	hashedData := sha256.Sum256(bytes)
+
+	return key.CreateJWSSignature(privKey, hashedData[:])
+}
+
+func serializeNetworkResult(result *NetworkConfirmResult, challenge string) ([]byte, error) {
+	var buffer bytes.Buffer
+	buffer.WriteString(result.Did)
+	buffer.WriteString(result.Target)
+	buffer.WriteString(result.LastBlockHash)
+	buffer.WriteString(challenge)
+
+	return buffer.Bytes(), nil
 }

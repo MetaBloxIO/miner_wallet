@@ -63,13 +63,13 @@ func (p *ChallengePool) CheckChallenge(session string, challenge uint64) bool {
 	return true
 }
 
-func (p *ChallengePool) GetTargetChallenge(session string) (uint64, error) {
+func (p *ChallengePool) GetChallenge(session string) (*ChallengeRecord, error) {
 	c1, exists := p.sessions[session]
 	if exists == false {
-		return 0, errors.New("SessionNotFound")
+		return nil, errors.New("SessionNotFound")
 	}
 
-	return c1.TargetChallenge, nil
+	return &c1, nil
 }
 
 func (p *ChallengePool) IncrSelfChallenge(session string) error {
