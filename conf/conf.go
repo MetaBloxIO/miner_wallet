@@ -9,14 +9,42 @@ import (
 )
 
 type Conf struct {
-	Did             string                      `json:"did"`
-	PrivateKey      string                      `json:"PrivateKey"`
-	Node            string                      `json:"Node"`
-	ContractAddress string                      `json:"ContractAddress"`
-	MinerVC         models.VerifiableCredential `json:"MinerVC"`
+	Did             string
+	PrivateKey      string
+	Node            string
+	ContractAddress string
+	MinerVC         models.VerifiableCredential
 }
 
-func LoadConf(file string) (*Conf, error) {
+type ConfFile struct {
+	Did             string `json:"did"`
+	PrivateKey      string `json:"privateKey"`
+	Node            string `json:"node"`
+	ContractAddress string `json:"contractAddress"`
+}
+
+func LoadConf(confFile string, vcFile string) (*Conf, error) {
+	confParam, err := loadConfFile(confFile)
+	if err != nil {
+		log.WithFields(log.Fields{
+			"error": err,
+			"file":  confFile,
+		}).Error("Load conf error")
+	}
+
+	vc, err := loadVcFile(vcFile)
+	if err != nil {
+		log.WithFields(log.Fields{
+			"error": err,
+			"file":  vcFile,
+		}).Error("Load conf error")
+	}
+
+	return &Conf{Did: confParam.Did, PrivateKey: confParam.PrivateKey,
+		Node: confParam.Node, ContractAddress: confParam.ContractAddress, MinerVC: *vc}, nil
+}
+
+func loadVcFile(file string) (*models.VerifiableCredential, error) {
 	configFile, err := os.Open(file)
 	if err != nil {
 		log.WithFields(log.Fields{
@@ -36,8 +64,8 @@ func LoadConf(file string) (*Conf, error) {
 		return nil, err
 	}
 
-	var conf Conf
-	err = json.Unmarshal(fileContents, &conf)
+	var vc models.VerifiableCredential
+	err = json.Unmarshal(fileContents, &vc)
 	if err != nil {
 		log.WithFields(log.Fields{
 			"path":  file,
@@ -46,5 +74,38 @@ func LoadConf(file string) (*Conf, error) {
 		return nil, err
 	}
 
-	return &conf, nil
+	return &vc, nil
+}
+
+func loadConfFile(file string) (*ConfFile, error) {
+	configFile, err := os.Open(file)
+	if err != nil {
+		log.WithFields(log.Fields{
+			"path":  file,
+			"error": err,
+		}).Error("Open config file failed")
+		return nil, err
+	}
+	defer configFile.Close()
+
+	fileContents, err := ioutil.ReadAll(configFile)
+	if err != nil {
+		log.WithFields(log.Fields{
+			"path":  file,
+			"error": err,
+		}).Error("read config file failed")
+		return nil, err
+	}
+
+	var confFile ConfFile
+	err = json.Unmarshal(fileContents, &confFile)
+	if err != nil {
+		log.WithFields(log.Fields{
+			"path":  file,
+			"error": err,
+		}).Error("parser config file failed")
+		return nil, err
+	}
+
+	return &confFile, nil
 }
