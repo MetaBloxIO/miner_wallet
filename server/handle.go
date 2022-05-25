@@ -28,7 +28,7 @@ const (
 )
 
 func InitRouter() *gin.Engine {
-	conf, err := conf.LoadConf("./conf/config.json")
+	conf, err := conf.LoadConf("./conf/config.json", "./conf/vc.json")
 	if err != nil {
 		log.Error("Load config file failed")
 		return nil
