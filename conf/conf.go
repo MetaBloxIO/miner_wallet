@@ -30,6 +30,7 @@ func LoadConf(confFile string, vcFile string) (*Conf, error) {
 			"error": err,
 			"file":  confFile,
 		}).Error("Load conf error")
+		return nil, err
 	}
 
 	vc, err := loadVcFile(vcFile)
@@ -38,6 +39,7 @@ func LoadConf(confFile string, vcFile string) (*Conf, error) {
 			"error": err,
 			"file":  vcFile,
 		}).Error("Load conf error")
+		return nil, err
 	}
 
 	return &Conf{Did: confParam.Did, PrivateKey: confParam.PrivateKey,

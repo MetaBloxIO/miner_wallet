@@ -9,5 +9,5 @@ func main() {
 
 	router := server.InitRouter()
 
-	router.Run()
+	router.Run(":3000")
 }

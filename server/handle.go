@@ -37,7 +37,7 @@ func InitRouter() *gin.Engine {
 	pool := NewChallengePool()
 	router := gin.New()
 
-	router.GET("/challenge/:session", func(c *gin.Context) {
+	router.POST("/challenge/:session", func(c *gin.Context) {
 		session := c.Param("session")
 		var req ChallengeRequest
 
@@ -55,7 +55,7 @@ func InitRouter() *gin.Engine {
 
 		challenge, _ := pool.ApplyChallenge(session, targetChallenge)
 
-		resp := Response{Code: Success, Data: challenge}
+		resp := Response{Code: Success, Data: strconv.FormatUint(challenge, 10)}
 
 		c.IndentedJSON(http.StatusOK, resp)
 	})
