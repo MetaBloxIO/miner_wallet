@@ -13,13 +13,15 @@ type NetworkConfirmRequest struct {
 	Did           string `json:"did"`
 	Target        string `json:"target"`
 	LastBlockHash string `json:"lastBlockHash"`
-	Quality       string `json:"Quality"`
-	Signature     string `json:"Signature"`
+	Quality       string `json:"quality"`
+	PubKey        string `json:"pubKey"`
+	Signature     string `json:"signature"`
 }
 
 type NetworkConfirmResult struct {
 	Did           string `json:"did"`
 	Target        string `json:"target"`
 	LastBlockHash string `json:"lastBlockHash"`
-	Signature     string `json:"Signature"`
+	PubKey        string `json:"pubKey"`
+	Signature     string `json:"signature"`
 }

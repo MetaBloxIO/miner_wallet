@@ -2,7 +2,9 @@ package server
 
 import (
 	"bytes"
+	"crypto/ecdsa"
 	"crypto/sha256"
+	"encoding/base64"
 	"errors"
 	"github.com/MetaBloxIO/metablox-foundation-services/did"
 	"github.com/MetaBloxIO/metablox-foundation-services/key"
@@ -11,7 +13,6 @@ import (
 	"github.com/MetaBloxIO/miner_wallet/conf"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/gin-gonic/gin"
-	"github.com/multiformats/go-multibase"
 	log "github.com/sirupsen/logrus"
 	"net/http"
 	"strconv"
@@ -152,8 +153,18 @@ func InitRouter() *gin.Engine {
 		}
 
 		//TODO Get last blockchain
-		respResult := NetworkConfirmResult{Did: conf.Did, Target: body.Did, LastBlockHash: ""}
-		signature, err := signNetworkResult(&respResult, conf.PrivateKey, strconv.FormatUint(challenge.TargetChallenge, 10))
+
+		privKey, err := crypto.HexToECDSA(conf.PrivateKey)
+		if err != nil {
+			sendError(ServerInnerError, nil, c)
+			return
+		}
+
+		pubKeyBytes := crypto.FromECDSAPub(&privKey.PublicKey)
+		pubkeyStr := base64.StdEncoding.EncodeToString(pubKeyBytes)
+
+		respResult := NetworkConfirmResult{Did: conf.Did, Target: body.Did, PubKey: pubkeyStr, LastBlockHash: ""}
+		signature, err := signNetworkResult(&respResult, privKey, strconv.FormatUint(challenge.TargetChallenge, 10))
 		if err != nil || result == false {
 			sendError(ServerInnerError, nil, c)
 			return
@@ -201,21 +212,16 @@ func createDid(privKeyHex string, didStr string) (*models.DIDDocument, error) {
 	document.Updated = document.Created
 	document.Version = 1
 
-	pubData := crypto.FromECDSAPub(&privKey.PublicKey)
+	address := crypto.PubkeyToAddress(privKey.PublicKey)
 
 	VM := models.VerificationMethod{}
 	VM.ID = document.ID + "#verification"
-	VM.MultibaseKey, err = multibase.Encode(multibase.Base58BTC, pubData)
-	if err != nil {
-		return nil, err
-	}
+	VM.BlockchainAccountId = "eip155:1:" + address.Hex()
 	VM.Controller = document.ID
 	VM.MethodType = models.Secp256k1Key
 
 	document.VerificationMethod = append(document.VerificationMethod, VM)
 	document.Authentication = VM.ID
-
-	//once blockchain is implemented, will also need to upload the document to the blockchain
 
 	return document, nil
 }
@@ -236,7 +242,7 @@ func verifyNetworkReq(req *NetworkConfirmRequest, challenge string) (bool, error
 	targetVM := holderDoc.VerificationMethod[0]
 
 	hashedData := sha256.Sum256(bytes)
-	_, pubData, err := multibase.Decode(targetVM.MultibaseKey)
+	pubData, err := base64.StdEncoding.DecodeString(req.PubKey)
 	if err != nil {
 		return false, err
 	}
@@ -245,6 +251,14 @@ func verifyNetworkReq(req *NetworkConfirmRequest, challenge string) (bool, error
 	if err != nil {
 		return false, err
 	}
+
+	address := crypto.PubkeyToAddress(*pubKey)
+	accountId := "eip155:1:" + address.Hex()
+
+	if accountId != targetVM.BlockchainAccountId {
+		return false, errors.New("pubkey and document mismatch")
+	}
+
 	return key.VerifyJWSSignature(req.Signature, pubKey, hashedData[:])
 }
 
@@ -254,21 +268,17 @@ func serializeNetworkReq(req *NetworkConfirmRequest, challenge string) ([]byte, 
 	buffer.WriteString(req.Target)
 	buffer.WriteString(req.LastBlockHash)
 	buffer.WriteString(req.Quality)
+	buffer.WriteString(req.PubKey)
 	buffer.WriteString(challenge)
 
 	return buffer.Bytes(), nil
 }
 
-func signNetworkResult(result *NetworkConfirmResult, privKeyHex string, challenge string) (string, error) {
+func signNetworkResult(result *NetworkConfirmResult, privKey *ecdsa.PrivateKey, challenge string) (string, error) {
 	bytes, err := serializeNetworkResult(result, challenge)
 
 	if err != nil {
 		log.Error("Serial")
-		return "", err
-	}
-
-	privKey, err := crypto.HexToECDSA(privKeyHex)
-	if err != nil {
 		return "", err
 	}
 
@@ -282,6 +292,7 @@ func serializeNetworkResult(result *NetworkConfirmResult, challenge string) ([]b
 	buffer.WriteString(result.Did)
 	buffer.WriteString(result.Target)
 	buffer.WriteString(result.LastBlockHash)
+	buffer.WriteString(result.PubKey)
 	buffer.WriteString(challenge)
 
 	return buffer.Bytes(), nil
