@@ -5,7 +5,9 @@ import (
 	"crypto/ecdsa"
 	"crypto/sha256"
 	"encoding/base64"
+	"encoding/json"
 	"errors"
+	"github.com/MetaBloxIO/metablox-foundation-services/credentials"
 	"github.com/MetaBloxIO/metablox-foundation-services/did"
 	"github.com/MetaBloxIO/metablox-foundation-services/key"
 	"github.com/MetaBloxIO/metablox-foundation-services/models"
@@ -16,7 +18,6 @@ import (
 	log "github.com/sirupsen/logrus"
 	"net/http"
 	"strconv"
-	"time"
 )
 
 const (
@@ -82,23 +83,16 @@ func InitRouter() *gin.Engine {
 			sendError(VPInvalid, nil, c)
 		}
 
+		credentials.IssuerDID = body.VerifiableCredential[0].Issuer
+
+		for i, _ := range body.VerifiableCredential {
+			patchVCSubjects(&body.VerifiableCredential[i])
+		}
+
 		ret, err := presentations.VerifyVP(&body)
 		if err != nil || ret == false {
 			sendError(VPInvalid, nil, c)
 			return
-		}
-
-		//TODO 2. Create response vp
-
-		selfDoc, err := createDid(conf.PrivateKey, conf.Did)
-		if err != nil {
-			log.Error("Create did document failed")
-			sendError(ServerInnerError, nil, c)
-			return
-		}
-
-		vcs := []models.VerifiableCredential{
-			conf.MinerVC,
 		}
 
 		privKey, err := crypto.HexToECDSA(conf.PrivateKey)
@@ -106,6 +100,11 @@ func InitRouter() *gin.Engine {
 			log.Error("Create key failed")
 			sendError(ServerInnerError, nil, c)
 			return
+		}
+		selfDoc := did.CreateDID(privKey)
+
+		vcs := []models.VerifiableCredential{
+			conf.MinerVC,
 		}
 
 		targetChallenge, err := pool.GetChallenge(session)
@@ -185,7 +184,7 @@ func sendError(err int, data interface{}, c *gin.Context) {
 
 func checkVcSubType(credentials []models.VerifiableCredential, subType string) bool {
 	for _, credential := range credentials {
-		if credential.SubType == subType {
+		if credential.Type[1] == subType {
 			return true
 		}
 	}
@@ -193,37 +192,17 @@ func checkVcSubType(credentials []models.VerifiableCredential, subType string) b
 	return false
 }
 
-func createDid(privKeyHex string, didStr string) (*models.DIDDocument, error) {
-	document := new(models.DIDDocument)
-	privKey, err := crypto.HexToECDSA(privKeyHex)
-	if err != nil {
-		return nil, err
+func patchVCSubjects(vc *models.VerifiableCredential) {
+	subjectJsonStr, _ := json.Marshal(vc.CredentialSubject)
+	if vc.Type[1] == models.TypeWifi {
+		var wifiSubject models.WifiAccessInfo
+		json.Unmarshal(subjectJsonStr, &wifiSubject)
+		vc.CredentialSubject = wifiSubject
+	} else if vc.Type[1] == models.TypeMining {
+		var miningSubject models.MiningLicenseInfo
+		json.Unmarshal(subjectJsonStr, &miningSubject)
+		vc.CredentialSubject = miningSubject
 	}
-
-	if len(didStr) > 0 {
-		document.ID = didStr
-	} else {
-		document.ID = did.GenerateDIDString(privKey)
-	}
-	document.Context = make([]string, 0)
-	document.Context = append(document.Context, models.ContextDID)
-	document.Context = append(document.Context, models.ContextSecp256k1)
-	document.Created = time.Now().Format(time.RFC3339)
-	document.Updated = document.Created
-	document.Version = 1
-
-	address := crypto.PubkeyToAddress(privKey.PublicKey)
-
-	VM := models.VerificationMethod{}
-	VM.ID = document.ID + "#verification"
-	VM.BlockchainAccountId = "eip155:1:" + address.Hex()
-	VM.Controller = document.ID
-	VM.MethodType = models.Secp256k1Key
-
-	document.VerificationMethod = append(document.VerificationMethod, VM)
-	document.Authentication = VM.ID
-
-	return document, nil
 }
 
 func verifyNetworkReq(req *NetworkConfirmRequest, challenge string) (bool, error) {

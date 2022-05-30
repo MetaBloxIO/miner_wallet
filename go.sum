@@ -40,6 +40,8 @@ github.com/MetaBloxIO/metablox-foundation-services v0.0.0-20220516084044-3e3756b
 github.com/MetaBloxIO/metablox-foundation-services v0.0.0-20220516084044-3e3756b83a5c/go.mod h1:9I7I5v2qO8aamwvQb8enmDf/RHnc1QtyV6IO3bFEPfc=
 github.com/MetaBloxIO/metablox-foundation-services v0.0.0-20220524221542-0578cad783ad h1:B6Dx78WuIEEI6qY+h60DT3ErpQeQrpfvtDwy3CzSYQo=
 github.com/MetaBloxIO/metablox-foundation-services v0.0.0-20220524221542-0578cad783ad/go.mod h1:9I7I5v2qO8aamwvQb8enmDf/RHnc1QtyV6IO3bFEPfc=
+github.com/MetaBloxIO/metablox-foundation-services v0.0.0-20220530033220-46fc25f3fdf1 h1:KgQW5Fpn4fBF2iOTeMMfsr7q4opKWuaqTZPr9fwjML0=
+github.com/MetaBloxIO/metablox-foundation-services v0.0.0-20220530033220-46fc25f3fdf1/go.mod h1:9I7I5v2qO8aamwvQb8enmDf/RHnc1QtyV6IO3bFEPfc=
 github.com/OneOfOne/xxhash v1.2.2/go.mod h1:HSdplMjZKSmBqAxg5vPj2TmRDmfkzw+cTzAElWljhcU=
 github.com/StackExchange/wmi v0.0.0-20180116203802-5d049714c4a6/go.mod h1:3eOhrUMpNV+6aFIbp5/iudMxNCF27Vw2OZgy4xEx0Fg=
 github.com/StackExchange/wmi v0.0.0-20190523213315-cbe66965904d h1:G0m3OIz70MZUWq3EgK3CesDbo8upS2Vm9/P3FtgI+Jk=

@@ -6,7 +6,7 @@ import (
 	"time"
 )
 
-const timeout = 10
+const timeout = 3600
 
 type ChallengeRecord struct {
 	Time            time.Time
