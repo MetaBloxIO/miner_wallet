@@ -17,14 +17,14 @@ type ChallengeRecord struct {
 type ChallengePool struct {
 	timer    *time.Timer
 	stop     chan struct{}
-	sessions map[string]ChallengeRecord
+	sessions map[string]*ChallengeRecord
 }
 
 func NewChallengePool() *ChallengePool {
 	pool := &ChallengePool{
 		timer:    time.NewTimer(time.Second * timeout * 5),
 		stop:     make(chan struct{}),
-		sessions: make(map[string]ChallengeRecord)}
+		sessions: make(map[string]*ChallengeRecord)}
 
 	go func(pool *ChallengePool) {
 		select {
@@ -40,7 +40,7 @@ func NewChallengePool() *ChallengePool {
 
 func (p *ChallengePool) ApplyChallenge(session string, targetChallenge uint64) (uint64, error) {
 	record := ChallengeRecord{Time: time.Now(), SelfChallenge: rand.Uint64(), TargetChallenge: targetChallenge}
-	p.sessions[session] = record
+	p.sessions[session] = &record
 	return record.SelfChallenge, nil
 }
 
@@ -69,7 +69,7 @@ func (p *ChallengePool) GetChallenge(session string) (*ChallengeRecord, error) {
 		return nil, errors.New("SessionNotFound")
 	}
 
-	return &c1, nil
+	return c1, nil
 }
 
 func (p *ChallengePool) IncrSelfChallenge(session string) error {

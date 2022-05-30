@@ -15,6 +15,7 @@ type NetworkConfirmRequest struct {
 	LastBlockHash string `json:"lastBlockHash"`
 	Quality       string `json:"quality"`
 	PubKey        string `json:"pubKey"`
+	Challenge     string `json:"challenge"`
 	Signature     string `json:"signature"`
 }
 
@@ -23,5 +24,6 @@ type NetworkConfirmResult struct {
 	Target        string `json:"target"`
 	LastBlockHash string `json:"lastBlockHash"`
 	PubKey        string `json:"pubKey"`
+	Challenge     string `json:"challenge"`
 	Signature     string `json:"signature"`
 }

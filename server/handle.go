@@ -143,9 +143,14 @@ func InitRouter() *gin.Engine {
 			return
 		}
 
+		if body.Challenge != strconv.FormatUint(challenge.SelfChallenge, 10) {
+			sendError(NonceInvalid, nil, c)
+			return
+		}
+
 		//TODO Check Last blockchain
 
-		result, err := verifyNetworkReq(&body, strconv.FormatUint(challenge.SelfChallenge, 10))
+		result, err := verifyNetworkReq(&body)
 		if err != nil || result == false {
 			sendError(ServerInnerError, nil, c)
 			return
@@ -162,8 +167,13 @@ func InitRouter() *gin.Engine {
 		pubKeyBytes := crypto.FromECDSAPub(&privKey.PublicKey)
 		pubkeyStr := base64.StdEncoding.EncodeToString(pubKeyBytes)
 
-		respResult := NetworkConfirmResult{Did: conf.Did, Target: body.Did, PubKey: pubkeyStr, LastBlockHash: ""}
-		signature, err := signNetworkResult(&respResult, privKey, strconv.FormatUint(challenge.TargetChallenge, 10))
+		respResult := NetworkConfirmResult{Did: conf.Did,
+			Target:        body.Did,
+			PubKey:        pubkeyStr,
+			LastBlockHash: "",
+			Challenge:     strconv.FormatUint(challenge.TargetChallenge, 10),
+		}
+		signature, err := signNetworkResult(&respResult, privKey)
 		if err != nil || result == false {
 			sendError(ServerInnerError, nil, c)
 			return
@@ -205,8 +215,8 @@ func patchVCSubjects(vc *models.VerifiableCredential) {
 	}
 }
 
-func verifyNetworkReq(req *NetworkConfirmRequest, challenge string) (bool, error) {
-	bytes, err := serializeNetworkReq(req, challenge)
+func verifyNetworkReq(req *NetworkConfirmRequest) (bool, error) {
+	bytes, err := serializeNetworkReq(req)
 
 	if err != nil {
 		log.Error("Serial")
@@ -232,7 +242,7 @@ func verifyNetworkReq(req *NetworkConfirmRequest, challenge string) (bool, error
 	}
 
 	address := crypto.PubkeyToAddress(*pubKey)
-	accountId := "eip155:1:" + address.Hex()
+	accountId := "eip155:1666600000:" + address.Hex()
 
 	if accountId != targetVM.BlockchainAccountId {
 		return false, errors.New("pubkey and document mismatch")
@@ -241,20 +251,20 @@ func verifyNetworkReq(req *NetworkConfirmRequest, challenge string) (bool, error
 	return key.VerifyJWSSignature(req.Signature, pubKey, hashedData[:])
 }
 
-func serializeNetworkReq(req *NetworkConfirmRequest, challenge string) ([]byte, error) {
+func serializeNetworkReq(req *NetworkConfirmRequest) ([]byte, error) {
 	var buffer bytes.Buffer
 	buffer.WriteString(req.Did)
 	buffer.WriteString(req.Target)
 	buffer.WriteString(req.LastBlockHash)
 	buffer.WriteString(req.Quality)
 	buffer.WriteString(req.PubKey)
-	buffer.WriteString(challenge)
+	buffer.WriteString(req.Challenge)
 
 	return buffer.Bytes(), nil
 }
 
-func signNetworkResult(result *NetworkConfirmResult, privKey *ecdsa.PrivateKey, challenge string) (string, error) {
-	bytes, err := serializeNetworkResult(result, challenge)
+func signNetworkResult(result *NetworkConfirmResult, privKey *ecdsa.PrivateKey) (string, error) {
+	bytes, err := serializeNetworkResult(result)
 
 	if err != nil {
 		log.Error("Serial")
@@ -266,13 +276,13 @@ func signNetworkResult(result *NetworkConfirmResult, privKey *ecdsa.PrivateKey, 
 	return key.CreateJWSSignature(privKey, hashedData[:])
 }
 
-func serializeNetworkResult(result *NetworkConfirmResult, challenge string) ([]byte, error) {
+func serializeNetworkResult(result *NetworkConfirmResult) ([]byte, error) {
 	var buffer bytes.Buffer
 	buffer.WriteString(result.Did)
 	buffer.WriteString(result.Target)
 	buffer.WriteString(result.LastBlockHash)
 	buffer.WriteString(result.PubKey)
-	buffer.WriteString(challenge)
+	buffer.WriteString(result.Challenge)
 
 	return buffer.Bytes(), nil
 }
