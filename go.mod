@@ -3,7 +3,7 @@ module github.com/MetaBloxIO/miner_wallet
 go 1.18
 
 require (
-	github.com/MetaBloxIO/metablox-foundation-services v0.0.0-20220530033220-46fc25f3fdf1
+	github.com/MetaBloxIO/metablox-foundation-services v0.0.0-20220531132944-8b5e5dec37f5
 	github.com/ethereum/go-ethereum v1.10.17
 	github.com/gin-gonic/gin v1.7.7
 	github.com/google/uuid v1.2.0
