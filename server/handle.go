@@ -3,19 +3,20 @@ package server
 import (
 	"bytes"
 	"crypto/ecdsa"
+	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"github.com/MetaBloxIO/metablox-foundation-services/credentials"
 	"github.com/MetaBloxIO/metablox-foundation-services/did"
-	"github.com/MetaBloxIO/metablox-foundation-services/key"
 	"github.com/MetaBloxIO/metablox-foundation-services/models"
 	"github.com/MetaBloxIO/metablox-foundation-services/presentations"
 	"github.com/MetaBloxIO/miner_wallet/conf"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/gin-gonic/gin"
 	log "github.com/sirupsen/logrus"
+	"math/big"
 	"net/http"
 	"strconv"
 )
@@ -248,7 +249,14 @@ func verifyNetworkReq(req *NetworkConfirmRequest) (bool, error) {
 		return false, errors.New("pubkey and document mismatch")
 	}
 
-	return key.VerifyJWSSignature(req.Signature, pubKey, hashedData[:])
+	sig, err := base64.StdEncoding.DecodeString(req.Signature)
+	if err != nil {
+		return false, err
+	}
+	r := new(big.Int).SetBytes(sig[:32])
+	s := new(big.Int).SetBytes(sig[32:])
+
+	return ecdsa.Verify(pubKey, hashedData[:], r, s), nil
 }
 
 func serializeNetworkReq(req *NetworkConfirmRequest) ([]byte, error) {
@@ -273,7 +281,30 @@ func signNetworkResult(result *NetworkConfirmResult, privKey *ecdsa.PrivateKey) 
 
 	hashedData := sha256.Sum256(bytes)
 
-	return key.CreateJWSSignature(privKey, hashedData[:])
+	r, s, err := ecdsa.Sign(rand.Reader, privKey, hashedData[:])
+
+	halfN := new(big.Int).Div(privKey.Curve.Params().N, big.NewInt(2))
+	if s.Cmp(halfN) > 0 {
+		s = new(big.Int).Sub(privKey.Curve.Params().N, s)
+	}
+
+	curveBits := privKey.Curve.Params().BitSize
+	keyBytes := curveBits / 8
+	if curveBits%8 > 0 {
+		keyBytes++
+	}
+
+	rBytes := r.Bytes()
+	rBytesPadded := make([]byte, keyBytes)
+	copy(rBytesPadded[keyBytes-len(rBytes):], rBytes)
+
+	sBytes := s.Bytes()
+	sBytesPadded := make([]byte, keyBytes)
+	copy(sBytesPadded[keyBytes-len(sBytes):], sBytes)
+
+	out := append(rBytesPadded, sBytesPadded...)
+
+	return base64.StdEncoding.EncodeToString(out), nil
 }
 
 func serializeNetworkResult(result *NetworkConfirmResult) ([]byte, error) {
