@@ -75,6 +75,10 @@ func loadVcFile(file string) (*models.VerifiableCredential, error) {
 		}).Error("parser config file failed")
 		return nil, err
 	}
+	subjectJsonStr, _ := json.Marshal(vc.CredentialSubject)
+	var miningSubject models.MiningLicenseInfo
+	json.Unmarshal(subjectJsonStr, &miningSubject)
+	vc.CredentialSubject = miningSubject
 
 	return &vc, nil
 }
