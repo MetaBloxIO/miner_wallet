@@ -15,14 +15,14 @@ type ChallengeRecord struct {
 }
 
 type ChallengePool struct {
-	timer    *time.Timer
+	timer    *time.Ticker
 	stop     chan struct{}
 	sessions map[string]*ChallengeRecord
 }
 
 func NewChallengePool() *ChallengePool {
 	pool := &ChallengePool{
-		timer:    time.NewTimer(time.Second * timeout * 5),
+		timer:    time.NewTicker(time.Second * timeout * 5),
 		stop:     make(chan struct{}),
 		sessions: make(map[string]*ChallengeRecord)}
 

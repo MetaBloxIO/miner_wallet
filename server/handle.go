@@ -74,8 +74,8 @@ func InitRouter() *gin.Engine {
 			return
 		}
 
-		pool.CheckChallenge(session, challenge)
-		if err != nil {
+		ret := pool.CheckChallenge(session, challenge)
+		if !ret {
 			sendError(NonceInvalid, nil, c)
 			return
 		}
@@ -90,7 +90,7 @@ func InitRouter() *gin.Engine {
 			patchVCSubjects(&body.VerifiableCredential[i])
 		}
 
-		ret, err := presentations.VerifyVP(&body)
+		ret, err = presentations.VerifyVP(&body)
 		if err != nil || ret == false {
 			sendError(VPInvalid, nil, c)
 			return
