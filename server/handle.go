@@ -82,6 +82,7 @@ func InitRouter() *gin.Engine {
 
 		if false == checkVcSubType(body.VerifiableCredential, models.TypeWifi) {
 			sendError(VPInvalid, nil, c)
+			return
 		}
 
 		credentials.IssuerDID = body.VerifiableCredential[0].Issuer
